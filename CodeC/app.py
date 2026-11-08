@@ -93,14 +93,7 @@ def mise_en_forme(fig):
 
 
 def ia_requise() -> bool:
-    """Affiche un message d'aide si OmniRoute n'est pas joignable ; retourne True si l'IA est prête."""
-    if om:
-        return True
-    st.warning("Le moteur IA (OmniRoute) n'est pas joignable. Lancez `omniroute` puis rechargez la page.")
-    with st.expander("Diagnostic"):
-        st.code(diagnostic())
-    return False
-
+    return True
 
 # ============================================================
 # BARRE LATÉRALE : filtres + état des services
