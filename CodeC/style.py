@@ -9,7 +9,13 @@ ROUGE = "#d03b3b"
 CSS = f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-html, body, [class*="css"], .stApp {{ font-family: 'Inter', sans-serif; }}
+html, body, .stApp {{ font-family: 'Inter', sans-serif; }}
+
+[data-testid="stIconMaterial"] {{
+    font-family: "Material Symbols Rounded" !important;
+    font-feature-settings: "liga";
+    font-style: normal;
+}}
 .stApp {{ background: radial-gradient(1200px 500px at 85% -10%, #E3ECF8 0%, transparent 60%), #F3F6FB; }}
 #MainMenu, footer {{ visibility: hidden; }}
 header[data-testid="stHeader"] {{ background: transparent; }}
