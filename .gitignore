@@ -1,0 +1,27 @@
+# Secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+**/.streamlit/secrets.toml
+**/.streamlit/secrets.toml.*
+!**/.streamlit/secrets.toml.example
+passe.txt
+
+# Environnements et fichiers locaux
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.idea/
+.vscode/
+.DS_Store
+
+# Données personnelles / historiques générés par l'application
+Resultats/*.csv
+!Resultats/.gitkeep
+
+# Fichiers temporaires Excel
+~$*.xlsx
