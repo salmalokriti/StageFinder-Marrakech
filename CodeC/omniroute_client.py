@@ -9,10 +9,18 @@ _session = requests.Session()
 _session.trust_env = False
 
 
-def _bases() -> list:
-    """Adresses à essayer (localhost, puis 127.0.0.1 si localhost pose problème)."""
-    base = os.getenv("OMNIROUTE_BASE_URL", "http://localhost:20128/v1").rstrip("/")
-    return [base, base.replace("localhost", "127.0.0.1")] if "localhost" in base else [base]
+def _bases():
+    try:
+        import streamlit as st
+        base = st.secrets.get(
+            "OMNIROUTE_BASE_URL",
+            os.getenv("OMNIROUTE_BASE_URL", "http://localhost:20128/v1")
+        )
+    except Exception:
+        base = os.getenv("OMNIROUTE_BASE_URL", "http://localhost:20128/v1")
+
+    base = base.rstrip("/")
+    return [base]
 
 
 def _headers() -> dict:
