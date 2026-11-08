@@ -36,19 +36,7 @@ RESULTATS_DIR = PROJECT_DIR / "Resultats"
 OPPORTUNITES_FILE = DATA_DIR / "opportunites.xlsx"
 LOGO = BASE_DIR / "logo.png"
 
-# En local, les variables sont lues depuis CodeC/.env.
 load_dotenv(BASE_DIR / ".env")
-
-# Sur Streamlit Community Cloud, les valeurs sont stockées dans App settings > Secrets.
-# On les copie dans os.environ pour que les modules existants (SMTP, Google, LLM) les lisent.
-try:
-    for cle, valeur in st.secrets.items():
-        if isinstance(valeur, (str, int, float)):
-            os.environ.setdefault(str(cle), str(valeur))
-except Exception:
-    # En local, l'absence de secrets.toml est normale.
-    pass
-
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
 st.set_page_config(page_title="StageFinder Marrakech", page_icon=str(LOGO) if LOGO.exists() else None, layout="wide")
