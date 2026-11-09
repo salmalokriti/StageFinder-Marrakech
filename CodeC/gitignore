@@ -1,0 +1,80 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# =========================
+# Environnements virtuels
+# =========================
+.venv/
+venv/
+env/
+ENV/
+
+# =========================
+# Secrets et variables sensibles
+# =========================
+.env
+.env.*
+!.env.example
+secrets.toml
+.streamlit/secrets.toml
+
+# Clés / certificats
+*.pem
+*.key
+*.p12
+*.pfx
+
+# =========================
+# Streamlit
+# =========================
+.streamlit/config.toml
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# IDE et système
+# =========================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# Logs et fichiers temporaires
+# =========================
+*.log
+*.tmp
+*.bak
+.cache/
+temp/
+tmp/
+
+# =========================
+# Tests et couverture
+# =========================
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# =========================
+# Fichiers locaux volumineux (à adapter si nécessaire)
+# =========================
+# *.sqlite3
+# *.db
+# models/
