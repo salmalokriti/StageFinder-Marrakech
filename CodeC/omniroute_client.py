@@ -1,27 +1,21 @@
-
-"""Client OmniRoute (passerelle IA compatible OpenAI).
-
-Installation locale :
-npm install -g omniroute
-omniroute
-
-API : http://localhost:20128/v1
-"""
+```python
+"""Client OmniRoute : passerelle IA compatible OpenAI."""
 
 import os
 import requests
+import streamlit as st
+
 
 # Session HTTP
 _session = requests.Session()
-_session.trust_env = False
 
 
 def _configuration(nom: str, defaut: str = "") -> str:
-    """Lit une configuration depuis Streamlit Secrets ou les variables d'environnement."""
+    """Lire la configuration depuis Streamlit Secrets ou .env."""
+
     valeur = ""
 
     try:
-        import streamlit as st
         valeur = str(st.secrets.get(nom, "")).strip()
     except Exception:
         pass
@@ -33,41 +27,49 @@ def _configuration(nom: str, defaut: str = "") -> str:
 
 
 def _bases() -> list:
-    """Récupère l'adresse OmniRoute depuis Streamlit Secrets ou .env."""
+    """Récupérer l'adresse de l'API OmniRoute."""
 
-    base = _configuration(
-        "OMNIROUTE_BASE_URL",
-        "http://localhost:20128/v1"
-    )
+    base = _configuration("OMNIROUTE_BASE_URL")
+
+    if not base:
+        return []
 
     base = base.rstrip("/")
 
-    if "localhost" in base:
-        return [base, base.replace("localhost", "127.0.0.1")]
+    # Éviter localhost sur Streamlit Cloud
+    if "localhost" in base or "127.0.0.1" in base:
+        return []
 
     return [base]
 
 
 def _headers() -> dict:
-    """Récupère la clé API."""
+    """Récupérer la clé API."""
 
     cle = _configuration("OMNIROUTE_API_KEY")
 
-    return {"Authorization": f"Bearer {cle}"} if cle else {}
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    if cle:
+        headers["Authorization"] = f"Bearer {cle}"
+
+    return headers
 
 
 def omniroute_disponible() -> bool:
-    """Vérifie si le serveur OmniRoute est accessible."""
+    """Vérifier si l'API OmniRoute est accessible."""
 
     for base in _bases():
         try:
             r = _session.get(
                 f"{base}/models",
-                timeout=10,
-                headers=_headers()
+                headers=_headers(),
+                timeout=10
             )
 
-            if r.status_code in (200, 401, 403):
+            if r.status_code == 200:
                 return True
 
         except requests.RequestException:
@@ -77,50 +79,71 @@ def omniroute_disponible() -> bool:
 
 
 def diagnostic() -> str:
-    """Affiche un diagnostic de connexion."""
+    """Afficher un diagnostic de connexion."""
+
+    bases = _bases()
 
     lignes = [
-        f"Clé API configurée : {'oui' if _headers() else 'NON'}"
+        f"Clé API configurée : {'oui' if _configuration('OMNIROUTE_API_KEY') else 'NON'}"
     ]
 
-    for base in _bases():
+    if not bases:
+        lignes.append(
+            "Adresse API absente ou invalide : configure OMNIROUTE_BASE_URL."
+        )
+        return "\n".join(lignes)
+
+    for base in bases:
         try:
             r = _session.get(
                 f"{base}/models",
-                timeout=10,
-                headers=_headers()
+                headers=_headers(),
+                timeout=10
             )
 
-            lignes.append(f"{base}/models -> HTTP {r.status_code}")
+            lignes.append(
+                f"Connexion API : HTTP {r.status_code}"
+            )
 
         except requests.RequestException as e:
             lignes.append(
-                f"{base}/models -> injoignable ({type(e).__name__})"
+                f"Connexion impossible : {type(e).__name__}"
             )
 
     return "\n".join(lignes)
 
 
 def generer_texte(prompt: str, systeme: str = "") -> str:
-    """Envoie une demande au modèle IA via OmniRoute."""
+    """Envoyer une demande au modèle IA."""
 
-    messages = (
-        [{"role": "system", "content": systeme}]
-        if systeme else []
-    ) + [
-        {"role": "user", "content": prompt}
-    ]
+    bases = _bases()
 
-    derniere = None
+    if not bases:
+        raise RuntimeError(
+            "OMNIROUTE_BASE_URL n'est pas configurée. "
+            "Une adresse API accessible depuis Internet est nécessaire."
+        )
 
-    for base in _bases():
+    messages = []
+
+    if systeme:
+        messages.append({
+            "role": "system",
+            "content": systeme
+        })
+
+    messages.append({
+        "role": "user",
+        "content": prompt
+    })
+
+    derniere_erreur = None
+
+    for base in bases:
         try:
             r = _session.post(
                 f"{base}/chat/completions",
-                headers={
-                    **_headers(),
-                    "Content-Type": "application/json"
-                },
+                headers=_headers(),
                 json={
                     "model": _configuration("OMNIROUTE_MODEL", "auto"),
                     "messages": messages,
@@ -129,25 +152,32 @@ def generer_texte(prompt: str, systeme: str = "") -> str:
                 timeout=90
             )
 
-        except requests.RequestException as e:
-            derniere = e
-            continue
+            if r.status_code != 200:
+                raise RuntimeError(
+                    f"HTTP {r.status_code} : {r.text[:300]}"
+                )
 
-        if r.status_code != 200:
-            raise RuntimeError(
-                f"HTTP {r.status_code} : {r.text[:300]}"
-            )
-
-        try:
             contenu = r.json()["choices"][0]["message"]["content"]
+
+            if not isinstance(contenu, str):
+                raise RuntimeError(
+                    "Le contenu retourné par l'IA est invalide."
+                )
+
             return contenu.strip()
+
+        except requests.RequestException as e:
+            derniere_erreur = e
+            continue
 
         except (KeyError, IndexError, TypeError, ValueError) as e:
             raise RuntimeError(
-                f"Réponse OmniRoute invalide : {e}"
+                f"Réponse IA invalide : {e}"
             ) from e
 
-    raise RuntimeError(f"OmniRoute injoignable ({derniere})")
+    raise RuntimeError(
+        f"Impossible de contacter l'API IA : {derniere_erreur}"
+    )
 
 
 def rediger_email_candidature(
@@ -181,3 +211,4 @@ def rediger_email_candidature(
     )
 
     return generer_texte(prompt, systeme)
+```
