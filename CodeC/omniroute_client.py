@@ -1,21 +1,23 @@
-```python
-"""Client OmniRoute : passerelle IA compatible OpenAI."""
+"""Client IA Gemini compatible avec l'API OpenAI."""
 
 import os
 import requests
-import streamlit as st
-
 
 # Session HTTP
 _session = requests.Session()
+_session.trust_env = False
+
+# Configuration Gemini
+BASE_URL_DEFAUT = "https://generativelanguage.googleapis.com/v1beta/openai"
 
 
 def _configuration(nom: str, defaut: str = "") -> str:
-    """Lire la configuration depuis Streamlit Secrets ou .env."""
+    """Lit la configuration depuis Streamlit Secrets ou les variables d'environnement."""
 
     valeur = ""
 
     try:
+        import streamlit as st
         valeur = str(st.secrets.get(nom, "")).strip()
     except Exception:
         pass
@@ -27,46 +29,36 @@ def _configuration(nom: str, defaut: str = "") -> str:
 
 
 def _bases() -> list:
-    """Récupérer l'adresse de l'API OmniRoute."""
+    """Récupère l'adresse de l'API Gemini."""
 
-    base = _configuration("OMNIROUTE_BASE_URL")
+    base = _configuration("OMNIROUTE_BASE_URL", BASE_URL_DEFAUT)
 
-    if not base:
-        return []
-
-    base = base.rstrip("/")
-
-    # Éviter localhost sur Streamlit Cloud
-    if "localhost" in base or "127.0.0.1" in base:
-        return []
-
-    return [base]
+    return [base.rstrip("/")]
 
 
 def _headers() -> dict:
-    """Récupérer la clé API."""
+    """Récupère la clé API Gemini."""
 
     cle = _configuration("OMNIROUTE_API_KEY")
 
-    headers = {
+    return {
+        "Authorization": f"Bearer {cle}",
         "Content-Type": "application/json"
-    }
-
-    if cle:
-        headers["Authorization"] = f"Bearer {cle}"
-
-    return headers
+    } if cle else {}
 
 
 def omniroute_disponible() -> bool:
-    """Vérifier si l'API OmniRoute est accessible."""
+    """Vérifie si l'API Gemini est accessible."""
+
+    if not _headers():
+        return False
 
     for base in _bases():
         try:
             r = _session.get(
                 f"{base}/models",
-                headers=_headers(),
-                timeout=10
+                timeout=15,
+                headers=_headers()
             )
 
             if r.status_code == 200:
@@ -79,73 +71,60 @@ def omniroute_disponible() -> bool:
 
 
 def diagnostic() -> str:
-    """Afficher un diagnostic de connexion."""
-
-    bases = _bases()
+    """Affiche un diagnostic de connexion."""
 
     lignes = [
-        f"Clé API configurée : {'oui' if _configuration('OMNIROUTE_API_KEY') else 'NON'}"
+        f"Clé API configurée : {'oui' if _headers() else 'NON'}"
     ]
 
-    if not bases:
-        lignes.append(
-            "Adresse API absente ou invalide : configure OMNIROUTE_BASE_URL."
-        )
-        return "\n".join(lignes)
-
-    for base in bases:
+    for base in _bases():
         try:
             r = _session.get(
                 f"{base}/models",
-                headers=_headers(),
-                timeout=10
+                timeout=15,
+                headers=_headers()
             )
 
             lignes.append(
-                f"Connexion API : HTTP {r.status_code}"
+                f"API Gemini -> HTTP {r.status_code}"
             )
+
+            if r.status_code != 200:
+                lignes.append(r.text[:300])
 
         except requests.RequestException as e:
             lignes.append(
-                f"Connexion impossible : {type(e).__name__}"
+                f"API inaccessible : {type(e).__name__}"
             )
 
     return "\n".join(lignes)
 
 
 def generer_texte(prompt: str, systeme: str = "") -> str:
-    """Envoyer une demande au modèle IA."""
+    """Envoie une demande à Gemini et retourne le texte généré."""
 
-    bases = _bases()
+    if not _headers():
+        raise RuntimeError("Clé API Gemini non configurée.")
 
-    if not bases:
-        raise RuntimeError(
-            "OMNIROUTE_BASE_URL n'est pas configurée. "
-            "Une adresse API accessible depuis Internet est nécessaire."
-        )
+    messages = (
+        [{"role": "system", "content": systeme}]
+        if systeme else []
+    ) + [
+        {"role": "user", "content": prompt}
+    ]
 
-    messages = []
+    derniere = None
 
-    if systeme:
-        messages.append({
-            "role": "system",
-            "content": systeme
-        })
-
-    messages.append({
-        "role": "user",
-        "content": prompt
-    })
-
-    derniere_erreur = None
-
-    for base in bases:
+    for base in _bases():
         try:
             r = _session.post(
                 f"{base}/chat/completions",
                 headers=_headers(),
                 json={
-                    "model": _configuration("OMNIROUTE_MODEL", "auto"),
+                    "model": _configuration(
+                        "OMNIROUTE_MODEL",
+                        "gemini-3.8-flash"
+                    ),
                     "messages": messages,
                     "temperature": 0.7
                 },
@@ -154,30 +133,21 @@ def generer_texte(prompt: str, systeme: str = "") -> str:
 
             if r.status_code != 200:
                 raise RuntimeError(
-                    f"HTTP {r.status_code} : {r.text[:300]}"
+                    f"Erreur Gemini HTTP {r.status_code} : "
+                    f"{r.text[:500]}"
                 )
 
             contenu = r.json()["choices"][0]["message"]["content"]
 
-            if not isinstance(contenu, str):
-                raise RuntimeError(
-                    "Le contenu retourné par l'IA est invalide."
-                )
+            if not isinstance(contenu, str) or not contenu.strip():
+                raise RuntimeError("Gemini a retourné une réponse vide.")
 
             return contenu.strip()
 
         except requests.RequestException as e:
-            derniere_erreur = e
-            continue
+            derniere = e
 
-        except (KeyError, IndexError, TypeError, ValueError) as e:
-            raise RuntimeError(
-                f"Réponse IA invalide : {e}"
-            ) from e
-
-    raise RuntimeError(
-        f"Impossible de contacter l'API IA : {derniere_erreur}"
-    )
+    raise RuntimeError(f"Connexion Gemini impossible : {derniere}")
 
 
 def rediger_email_candidature(
@@ -211,4 +181,3 @@ def rediger_email_candidature(
     )
 
     return generer_texte(prompt, systeme)
-```
